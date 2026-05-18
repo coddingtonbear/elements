@@ -1,7 +1,5 @@
 import { faBullseye, faCloud, faCube, faCubes, faEnvelope, faEnvelopesBulk } from '@fortawesome/free-solid-svg-icons';
 import { IIconProps, ITextColorProps } from '@stoplight/mosaic';
-import { HttpMethod } from '@stoplight/types';
-
 // Icons appear left of the node title
 export const NODE_TYPE_TITLE_ICON: Readonly<{ [nodeType: string]: IIconProps['icon'] }> = {
   http_service: faCloud,
@@ -33,7 +31,7 @@ export const NODE_GROUP_ICON_COLOR: Readonly<{ [nodeType: string]: ITextColorPro
   model: 'warning',
 };
 
-export const NODE_META_COLOR: Readonly<Record<HttpMethod, string>> = {
+export const NODE_META_COLOR: Readonly<Record<string, string>> = {
   get: 'success',
   post: 'primary',
   put: 'warning',

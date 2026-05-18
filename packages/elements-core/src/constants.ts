@@ -10,7 +10,7 @@ import {
   IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { IntentVals } from '@stoplight/mosaic';
-import { Dictionary, HttpMethod, HttpSecurityScheme, NodeType } from '@stoplight/types';
+import { Dictionary, HttpSecurityScheme, NodeType } from '@stoplight/types';
 
 export const NodeTypeColors: Readonly<Dictionary<string, NodeType>> = {
   http_operation: '#6a6acb',
@@ -74,7 +74,7 @@ export const HttpSecuritySchemeColors: Readonly<Partial<Record<HttpSecuritySchem
   mutualTLS: 'blue',
 };
 
-export const HttpMethodColors: Readonly<Record<HttpMethod, string>> = {
+export const HttpMethodColors: Readonly<Record<string, string>> = {
   get: 'success',
   post: 'primary',
   put: 'warning',

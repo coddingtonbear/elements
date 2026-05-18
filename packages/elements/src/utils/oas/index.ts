@@ -19,6 +19,58 @@ import { oas2SourceMap } from './oas2';
 import { oas3SourceMap } from './oas3';
 import { ISourceNodeMap, NodeTypes, ServiceChildNode, ServiceNode } from './types';
 
+// Flattens OAS 3.2 additionalOperations into direct path item keys so the
+// standard traversal logic can pick them up without structural changes.
+function flattenAdditionalOperations(document: OpenAPIObject): { document: OpenAPIObject; customMethods: string[] } {
+  const customMethods = new Set<string>();
+
+  if (!document.paths) {
+    return { document, customMethods: [] };
+  }
+
+  const newPaths: PathObject = {};
+  for (const [path, pathItem] of Object.entries(document.paths)) {
+    if (!isObject(pathItem) || !('additionalOperations' in (pathItem as object))) {
+      newPaths[path] = pathItem;
+      continue;
+    }
+
+    const { additionalOperations, ...rest } = pathItem as Record<string, unknown>;
+    const newPathItem: Record<string, unknown> = { ...rest };
+
+    if (isObject(additionalOperations)) {
+      for (const [method, operation] of Object.entries(additionalOperations as Record<string, unknown>)) {
+        const lower = method.toLowerCase();
+        customMethods.add(lower);
+        newPathItem[lower] = operation;
+      }
+    }
+
+    newPaths[path] = newPathItem;
+  }
+
+  return { document: { ...document, paths: newPaths }, customMethods: [...customMethods] };
+}
+
+// Recursively extends all Operation/Webhook entries in a source map with
+// additional method names so custom HTTP verbs are recognised during traversal.
+function extendSourceMapWithMethods(map: ISourceNodeMap[], methods: string[]): ISourceNodeMap[] {
+  if (methods.length === 0) return map;
+  const extra = methods.join('|');
+
+  function extendEntry(entry: ISourceNodeMap): ISourceNodeMap {
+    if ((entry.type === NodeTypes.Operation || entry.type === NodeTypes.Webhook) && entry.match) {
+      return { ...entry, match: `${entry.match}|${extra}` };
+    }
+    if (entry.children) {
+      return { ...entry, children: entry.children.map(extendEntry) };
+    }
+    return entry;
+  }
+
+  return map.map(extendEntry);
+}
+
 type OpenAPIObject = _OpenAPIObject & {
   webhooks?: PathObject;
 };
@@ -44,15 +96,15 @@ const OAS_MODEL_REGEXP = /((definitions|components)\/?(schemas)?)\//;
 
 export function transformOasToServiceNode(apiDescriptionDocument: unknown) {
   if (isOas31(apiDescriptionDocument)) {
-    return computeServiceNode(
-      { ...apiDescriptionDocument, jsonSchemaDialect: 'http://json-schema.org/draft-07/schema#' },
-      oas3SourceMap,
-      transformOas3Service,
-      transformOas3Operation,
-    );
+    const base = { ...apiDescriptionDocument, jsonSchemaDialect: 'http://json-schema.org/draft-07/schema#' } as OpenAPIObject;
+    const { document, customMethods } = flattenAdditionalOperations(base);
+    const map = extendSourceMapWithMethods(oas3SourceMap, customMethods);
+    return computeServiceNode(document, map, transformOas3Service, transformOas3Operation);
   }
   if (isOas3(apiDescriptionDocument)) {
-    return computeServiceNode(apiDescriptionDocument, oas3SourceMap, transformOas3Service, transformOas3Operation);
+    const { document, customMethods } = flattenAdditionalOperations(apiDescriptionDocument as OpenAPIObject);
+    const map = extendSourceMapWithMethods(oas3SourceMap, customMethods);
+    return computeServiceNode(document, map, transformOas3Service, transformOas3Operation);
   } else if (isOas2(apiDescriptionDocument)) {
     return computeServiceNode(apiDescriptionDocument, oas2SourceMap, transformOas2Service, transformOas2Operation);
   }
